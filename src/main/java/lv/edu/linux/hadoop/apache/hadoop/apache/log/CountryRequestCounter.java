@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
+import lv.edu.linux.hadoop.apache.hadoop.apache.log.GeoIPDb.GeoIpRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
 import org.apache.hadoop.mapred.*;
@@ -12,16 +13,24 @@ import org.apache.hadoop.mapred.*;
 public class CountryRequestCounter {
 
 	public static class CountryMatcher {
-
+		
+		GeoIPDb db;
+		
+		CountryMatcher(GeoIPDb db) {
+			this.db = db;
+		}
+		
 		String ipToCountry(String ip) {
 			long ip_int = ipAddressToInt(ip);
 			return ipToCountry(ip_int);
 		}
 
 		private String ipToCountry(long ip) {
-			for (int i = 0; i < GeoIPDb.geoip_db.length; i++) {
-				if (GeoIPDb.geoip_db[i].cmp(ip) == 0) {
-					return GeoIPDb.geoip_db[i].country;
+			
+			for (int i = 0; i < db.records.size(); i++) {
+				GeoIpRecord rec = db.records.get(i);
+				if (rec.cmp(ip) == 0) {
+					return rec.country;
 				}
 			}
 			return "Unknown";
@@ -51,8 +60,18 @@ public class CountryRequestCounter {
 
 		private IntWritable country_count = new IntWritable(1);
 		private Text country = new Text();
-		private static CountryMatcher country_matcher = new CountryMatcher();
+		private static CountryMatcher country_matcher;
 
+		
+		@Override
+		public void configure(JobConf jobConf) {
+			String geoip_db_location = jobConf.get("geoipdb");
+			GeoIPDb db = new GeoIPDb(geoip_db_location);
+			
+			country_matcher = new CountryMatcher(db);
+			super.configure(jobConf);
+		}
+		
 		@Override
 		public void map(LongWritable key, Text value, OutputCollector<Text, IntWritable> output, Reporter reporter) throws IOException {
 			String line = value.toString();
@@ -100,7 +119,9 @@ public class CountryRequestCounter {
 		// and splits the line by the tab character to separate it into key and value
 		conf.setInputFormat(TextInputFormat.class);
 		conf.setOutputFormat(TextOutputFormat.class);
-
+		
+		// Location of geoip db on local filesystem for local runs
+		conf.set("geoipdb", "file:///home/martins/hadoop/data/GeoIPCountryWhois.csv");
 
 		// Run this job locally
 		conf.set("mapreduce.jobtracker.address", "local");

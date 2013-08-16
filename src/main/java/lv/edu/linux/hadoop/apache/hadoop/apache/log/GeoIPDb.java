@@ -1,40 +1,52 @@
 package lv.edu.linux.hadoop.apache.hadoop.apache.log;
 
+import java.io.*;
+import java.util.*;
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.conf.*;
+
 public class GeoIPDb {
-	
-	static geoIpRecord[] geoip_db = {
-new geoIpRecord(2130706433, 2130706433, "localhost"),
-new geoIpRecord(86824960l, 86827007l, "Latvia"),
-new geoIpRecord(93904896l, 93906943l, "Latvia"),
-new geoIpRecord(95617024l, 95625215l, "Latvia"),
-new geoIpRecord(521715712l, 521717759l, "Latvia"),
-new geoIpRecord(522866688l, 522870783l, "Latvia"),
-new geoIpRecord(522866688l, 522870783l, "Latvia"),
 
+	public List<GeoIpRecord> records = new ArrayList<GeoIpRecord>();
 
+	GeoIPDb(String geoip_db_loc){
 
-	};
-	
-	public static class geoIpRecord {
-			
+		try {
+			Path pt = new Path(geoip_db_loc);
+			FileSystem fs = FileSystem.get(new Configuration());
+			BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pt)));
+			String line;
+			line = br.readLine();
+			while (line != null) {
+				
+				String[] data = line.split(",");
+				GeoIpRecord rec = new GeoIpRecord(Long.decode(data[0]), Long.decode(data[1]), data[2]);
+				records.add(rec);
+				line = br.readLine();
+			}
+		} catch (Exception e) {
+			System.err.println(e);
+		}
+	}
+
+	public static class GeoIpRecord {
+
 		long ip_start;
 		long ip_end;
 		String country;
 
-		geoIpRecord(long ip_start, long ip_end, String country) {
+		GeoIpRecord(long ip_start, long ip_end, String country) {
 			this.ip_start = ip_start;
 			this.ip_end = ip_end;
 			this.country = country;
 		}
 
 		int cmp(long ip) {
-			if(ip < ip_start) {
+			if (ip < ip_start) {
 				return -1;
-			}
-			else if(ip > ip_end) {
+			} else if (ip > ip_end) {
 				return 1;
-			}
-			else {
+			} else {
 				return 0;
 			}
 		}
