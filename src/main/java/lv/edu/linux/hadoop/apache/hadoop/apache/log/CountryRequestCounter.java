@@ -2,8 +2,6 @@ package lv.edu.linux.hadoop.apache.hadoop.apache.log;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.*;
 import lv.edu.linux.hadoop.apache.hadoop.apache.log.GeoIPDb.GeoIpRecord;
 import org.apache.hadoop.fs.Path;
@@ -21,38 +19,46 @@ public class CountryRequestCounter {
 		}
 		
 		String ipToCountry(String ip) {
-			long ip_int = ipAddressToInt(ip);
+			long ip_int = ipToLong(ip);
 			return ipToCountry(ip_int);
 		}
 
 		private String ipToCountry(long ip) {
 			
-			for (int i = 0; i < db.records.size(); i++) {
-				GeoIpRecord rec = db.records.get(i);
-				if (rec.cmp(ip) == 0) {
+			int bottom_record = 0;
+			int top_record = db.records.size()-1;
+			
+			GeoIpRecord rec;
+			
+			while(true) {
+				int middle = bottom_record+((top_record-bottom_record)/2);
+				rec = db.records.get(middle);
+				int cmp = rec.cmp(ip);
+				if(cmp == 0) {
 					return rec.country;
+				}
+				else if(cmp > 0) {
+					bottom_record=middle+1;
+				}
+				else if(cmp < 0) {
+					top_record=middle-1;
+				}
+				if(top_record == bottom_record) {
+					break;
 				}
 			}
 			return "Unknown";
 		}
 
-		private long ipAddressToInt(String ip_address) {
+		public static long ipToLong(String ipAddress) {
+			long result = 0;
+			String[] atoms = ipAddress.split("\\.");
 
-			try {
-				return pack(InetAddress.getByName(ip_address).getAddress());
-
-			} catch (UnknownHostException e) {
-				return 0L;
+			for (int i = 3; i >= 0; i--) {
+				result |= (Long.parseLong(atoms[3 - i]) << (i * 8));
 			}
-		}
 
-		private long pack(byte[] bytes) {
-			long val = 0;
-			for (int i = 0; i < bytes.length; i++) {
-				val <<= 8;
-				val |= bytes[i];
-			}
-			return val;
+			return result & 0xFFFFFFFF;
 		}
 	}
 
