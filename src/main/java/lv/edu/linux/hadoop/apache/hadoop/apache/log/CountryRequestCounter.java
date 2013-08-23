@@ -10,71 +10,17 @@ import org.apache.hadoop.mapred.*;
 
 public class CountryRequestCounter {
 
-	public static class CountryMatcher {
-		
-		GeoIPDb db;
-		
-		CountryMatcher(GeoIPDb db) {
-			this.db = db;
-		}
-		
-		String ipToCountry(String ip) {
-			long ip_int = ipToLong(ip);
-			return ipToCountry(ip_int);
-		}
-
-		private String ipToCountry(long ip) {
-			
-			int bottom_record = 0;
-			int top_record = db.records.size()-1;
-			
-			GeoIpRecord rec;
-			
-			while(true) {
-				int middle = bottom_record+((top_record-bottom_record)/2);
-				rec = db.records.get(middle);
-				int cmp = rec.cmp(ip);
-				if(cmp == 0) {
-					return rec.country;
-				}
-				else if(cmp > 0) {
-					bottom_record=middle+1;
-				}
-				else if(cmp < 0) {
-					top_record=middle-1;
-				}
-				if(top_record == bottom_record) {
-					break;
-				}
-			}
-			return "Unknown";
-		}
-
-		public static long ipToLong(String ipAddress) {
-			long result = 0;
-			String[] atoms = ipAddress.split("\\.");
-
-			for (int i = 3; i >= 0; i--) {
-				result |= (Long.parseLong(atoms[3 - i]) << (i * 8));
-			}
-
-			return result & 0xFFFFFFFF;
-		}
-	}
-
 	public static class CountryRequestCounterMapper extends MapReduceBase implements Mapper<LongWritable, Text, Text, IntWritable> {
 
 		private IntWritable country_count = new IntWritable(1);
 		private Text country = new Text();
-		private static CountryMatcher country_matcher;
+		private static GeoIPDb geoipdb;
 
 		
 		@Override
 		public void configure(JobConf jobConf) {
 			String geoip_db_location = jobConf.get("geoipdb");
-			GeoIPDb db = new GeoIPDb(geoip_db_location);
-			
-			country_matcher = new CountryMatcher(db);
+			geoipdb = new GeoIPDb(geoip_db_location);
 			super.configure(jobConf);
 		}
 		
@@ -86,7 +32,7 @@ public class CountryRequestCounter {
 			String ip = line.substring(0, pos);
 			int count = Integer.decode(line.substring(pos + 1));
 			country_count.set(count);
-			country.set(country_matcher.ipToCountry(ip));
+			country.set(geoipdb.ipToCountry(ip));
 			output.collect(country, country_count);
 		}
 	}
